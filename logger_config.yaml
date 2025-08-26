@@ -1,0 +1,49 @@
+version: 1
+formatters:
+  first:
+    format: '%(levelname)s:%(name)s:%(message)s'
+
+  second: 
+    format: '%(asctime)s %(message)s'
+    datefmt: '[%d.%m.%Y %H:%M]'
+
+handlers:
+  sm:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: first
+    filename: sender.log
+    mode: 'w'
+
+  rm:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: second
+    filename: reader.log
+    mode: 'a'
+
+  default:
+    class: logging.FileHandler
+    level: DEBUG
+    filename: default.log
+    mode: 'w'
+
+loggers:
+  sender:
+    level: DEBUG
+    handlers: [sm]
+    propagate: no
+
+  reader:
+    level: DEBUG
+    handlers: [rm]
+    propagate: no
+
+  default:
+    level: DEBUG
+    handlers: [default]
+    propagate: no
+
+root:
+  level: DEBUG
+  

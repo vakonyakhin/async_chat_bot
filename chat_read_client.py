@@ -1,7 +1,7 @@
 import asyncio
 import configargparse
 
-from chat_tools import get_logger, get_parser
+from chat_tools import get_logger, create_arg_parser, get_parse_arguments
 
 
 async def get_messsages(args):
@@ -35,7 +35,9 @@ async def get_messsages(args):
 
 
 if __name__ == "__main__":
+    config_path = ['./configs/reader.ini']
+    arg_parser = create_arg_parser(config_path)
+    arguments = get_parse_arguments(arg_parser)
     logger = get_logger('reader')
-    args = get_parser()
 
-    asyncio.run(get_messsages(args))
+    asyncio.run(get_messsages(arguments))

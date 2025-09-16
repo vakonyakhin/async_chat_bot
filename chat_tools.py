@@ -2,6 +2,7 @@ import logging
 import logging.config
 import yaml
 import configargparse
+import json
 
 
 def get_logger(name):
@@ -41,36 +42,36 @@ def get_logger(name):
     return logging.getLogger(name)
 
 
-def get_parser():
+def create_arg_parser(config_path=None):
+
     """
-    Configure and return a command-line argument parser for a chat application.
+    Creates and returns an instance of the ArgParser configured to load parameters from the specified configuration file.
 
-    This function creates an `ArgParser` instance from the `configargparse`
-    module, defines supported command-line arguments and their corresponding
-    environment variables, and returns the parsed arguments.
-    It supports configuration via both command-line flags and
-    environment variables.
-
-    Args (command-line/environment):
-        --host (str): Host address for server connection (environment: HOST).
-        --port (str): Port number for server connection (environment: PORT).
-        -history (str): File path for storing chat history
-        (environment: HISTORY_PATH).
-
-    Returns:
-        argparse.Namespace: An object containing parsed command-line arguments.
-            Attributes:
-                host (str): Host address provided via command-line
-                or environment.
-                port (str): Port number provided via command-line
-                or environment.
-                history (str): Chat history file path provided via command-line
-                or environment.
+    :param config_paths: List of paths to configuration files.
+    :return: Configured ArgParser.
     """
-    p = configargparse.ArgParser()
-    p.add('--host', env_var='HOST', help='host for connection')
-    p.add('--port', env_var='PORT', help='Port for connection')
-    p.add('-history', env_var='HISTORY_PATH', help='Path for chat history')
+    parser = configargparse.ArgParser(
+        description='TCP client for interacting with a chat server.',
+        formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
+        default_config_files=config_path
+    )
 
-    args = p.parse_args()
-    return args
+    # Add new arguments: username and token
+    parser.add('-c', '--config', is_config_file=True, help='Path to configuration file')
+    parser.add('--host', type=str, default='minechat.dvmn.org', env_var='HOST',
+          help='Host address for connection (default: minechat.dvmn.org)')
+    parser.add('--port', type=int, default=5000, env_var='PORT',
+          help='Port number for connection (default: 5000)')
+#    parser.add('--file', type=str, default='messages.log', env_var='FILE',
+#          help='Log filename for storing messages (default: messages.log)')
+    parser.add('--username', type=str, default='', env_var='USERNAME',
+          help='Username for authentication (default: empty string)')
+    parser.add('--token', type=str, default='', env_var='TOKEN',
+          help='Authentication token (default: empty string)')
+
+    return parser
+
+
+def get_parse_arguments(arg_parser):
+    """Parses command line arguments."""
+    return arg_parser.parse_args()

@@ -63,7 +63,7 @@ def create_arg_parser(config_path=None):
           help='Port number for connection (default: 5000)')
     parser.add('-u', '--username', type=str, default='', env_var='USERNAME',
           help='Username for authentication (default: empty string)')
-    parser.add('--text', type=str, required=True,
+    parser.add('--text', type=str, required=True, env_var='TEXT', 
           help='Required text parameter that must be passed on the command line.')
     parser.add('-t', '--token', type=str, default='', env_var='TOKEN',
           help='Authentication token (default: empty string)')

@@ -59,11 +59,13 @@ def create_arg_parser(config_path=None):
     parser.add('-c', '--config', is_config_file=True, help='Path to configuration file')
     parser.add('--host', type=str, default='minechat.dvmn.org', env_var='HOST',
           help='Host address for connection (default: minechat.dvmn.org)')
-    parser.add('--port', type=int, default=5000, env_var='PORT',
+    parser.add('-p','--port', type=int, default=5000, env_var='PORT',
           help='Port number for connection (default: 5000)')
-    parser.add('--username', type=str, default='', env_var='USERNAME',
+    parser.add('-u', '--username', type=str, default='', env_var='USERNAME',
           help='Username for authentication (default: empty string)')
-    parser.add('--token', type=str, default='', env_var='TOKEN',
+    parser.add('text', type=str, default='',
+               help='Text to send to the server')
+    parser.add('-t', '--token', type=str, default='', env_var='TOKEN',
           help='Authentication token (default: empty string)')
 
     return parser
@@ -72,3 +74,9 @@ def create_arg_parser(config_path=None):
 def get_parse_arguments(arg_parser):
     """Parses command line arguments."""
     return arg_parser.parse_args()
+
+def read_token():
+
+    with open('token.json', 'r') as file:
+        token = json.load(file)
+    return token['account_hash']

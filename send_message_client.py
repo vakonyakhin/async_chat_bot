@@ -2,7 +2,7 @@ import asyncio
 import json
 import sys
 
-from chat_tools import get_logger, get_parser
+from chat_tools import get_logger, create_arg_parser, get_parse_arguments, read_token
 
 
 async def authentication(reader, writer, token):
@@ -31,7 +31,7 @@ async def authentication(reader, writer, token):
     response_data = await reader.readline()
     if response_data.decode().strip() == 'null':
         print('Your token is incorrect. Please launch registration.py again')
-        sys.exit()
+        return False    
     else:
         logger.debug('Token checked successfully')
 
@@ -73,33 +73,24 @@ async def send_message(reader, writer):
             await writer.wait_closed()
 
 
-async def main():
-    args = get_parser()
-
-    try:
-        with open('token.json', 'r') as file:
-            logger.debug('Read token from file')
-            creds = file.read()
-            if not creds:
-                logger.debug(
-                    'You dont have token. ' \
-                    'Please launch registration.py.'
-                    )
-                sys.exit()
-            token = json.loads(creds)
-    except FileNotFoundError:
-        print('Cant found file. Please launch registration.py.')
-    except json.JSONDecodeError:
-        print('Cant decoded JSON. Please launch registration.py.')
+async def main(args):
+    
+    if args.token:
+        token = args.token
+    else:
+        token = read_token()
 
     reader, writer = await asyncio.open_connection(args.host, args.port)
     if reader and writer:
         logger.debug('Do authentification')
-        await authentication(reader, writer, token['account_hash'])
+        await authentication(reader, writer, token)
     logger.debug('Start sending messages')
     await send_message(reader, writer)
 
 
 if __name__ == "__main__":
+    config_paths = ['./configs/sender.ini']
     logger = get_logger('sender')
-    asyncio.run(main())
+    arg_parser = create_arg_parser(config_paths)
+    arguments = get_parse_arguments(arg_parser)
+    asyncio.run(main(arguments))

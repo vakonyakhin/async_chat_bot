@@ -111,3 +111,4 @@ venv.bak/
 #user files
 *.txt
 token.json
+test.ini

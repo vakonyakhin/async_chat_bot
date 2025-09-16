@@ -110,3 +110,4 @@ venv.bak/
 
 #user files
 *.txt
+token.json

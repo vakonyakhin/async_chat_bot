@@ -56,14 +56,11 @@ def create_arg_parser(config_path=None):
         default_config_files=config_path
     )
 
-    # Add new arguments: username and token
     parser.add('-c', '--config', is_config_file=True, help='Path to configuration file')
     parser.add('--host', type=str, default='minechat.dvmn.org', env_var='HOST',
           help='Host address for connection (default: minechat.dvmn.org)')
     parser.add('--port', type=int, default=5000, env_var='PORT',
           help='Port number for connection (default: 5000)')
-#    parser.add('--file', type=str, default='messages.log', env_var='FILE',
-#          help='Log filename for storing messages (default: messages.log)')
     parser.add('--username', type=str, default='', env_var='USERNAME',
           help='Username for authentication (default: empty string)')
     parser.add('--token', type=str, default='', env_var='TOKEN',

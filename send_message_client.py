@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sys
+import re
 
 from chat_tools import get_logger, create_arg_parser, get_parse_arguments, read_token
 
@@ -62,8 +63,9 @@ async def send_message(reader, writer):
         while True:
 
             message = input('')
-            logger.debug(f'Send message {message}')
-            writer.write(f'{message}\n\n'.encode())
+            escape_message = re.sub(r'\\n', ' ', message)
+            logger.debug(f'Send message {escape_message}')
+            writer.write(f'{escape_message}\n\n'.encode())
             await writer.drain()
             print(await reader.readline())
     except KeyboardInterrupt:
@@ -85,6 +87,12 @@ async def main(args):
         logger.debug('Do authentification')
         await authentication(reader, writer, token)
     logger.debug('Start sending messages')
+    if args.text:
+        message = re.sub(r'\n', ' ', args.text)
+        logger.debug(f'Send message {message}')
+        writer.write(f'{message}\n\n'.encode())
+        await writer.drain()
+
     await send_message(reader, writer)
 
 

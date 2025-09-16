@@ -2,7 +2,7 @@ import asyncio
 import logging
 import json
 
-from chat_tools import get_logger, get_parser
+from chat_tools import get_logger, get_parser, create_arg_parser, get_parse_arguments
 
 
 async def registration(args):
@@ -30,16 +30,19 @@ async def registration(args):
 
     logger.debug('Open connection for registration')
     reader, writer = await asyncio.open_connection(args.host, args.port)
-
     await reader.readline()
     logger.debug('Send empty hash')
     writer.write(f'.. \n'.encode())
     await writer.drain()
     await reader.readline()
-    print('Enter preferred nickname below:')
-    await reader.readline()
-
-    username = input('')
+    
+    if args.username:
+        username = args.username
+        await reader.readline()
+    else:
+        print('Enter preferred nickname below:')
+        await reader.readline()
+        username = input('')
     logger.debug('Send prefered username for registraion')
     writer.write(f'{username}\n'.encode())
     await writer.drain()
@@ -69,6 +72,9 @@ async def registration(args):
         await writer.wait_closed()
 
 if __name__ == '__main__':
+    config_path = ['./configs/sender.ini']
+
     logger = get_logger('default')
-    args = get_parser()
-    asyncio.run(registration(args))
+    arg_parser = create_arg_parser(config_path)
+    arguments = get_parse_arguments(arg_parser)
+    asyncio.run(registration(arguments))

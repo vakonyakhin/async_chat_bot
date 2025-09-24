@@ -37,7 +37,7 @@ async def save_messages(filepath, queue):
                 f.write(f'{msg}\n')
                 queue.task_done()
 
-                
+
 async def main():
 
     config_path = ['./configs/reader.ini']
@@ -49,7 +49,11 @@ async def main():
     sending_queue = asyncio.Queue()
     status_updates_queue = asyncio.Queue()
 
-
+    draw_task = asyncio.create_task(gui.draw(messages_queue, sending_queue, status_updates_queue))
+    read_task = asyncio.create_task(read_msgs(arguments.host, arguments.port, arguments.filepath, messages_queue, save_messages_queue))
+    save_task = asyncio.create_task(save_messages(arguments.filepath, save_messages_queue))
+    
+    await asyncio.gather(draw_task,read_task, save_task)
 
 if __name__ == "__main__":
     logger = get_logger('reader')

@@ -61,6 +61,8 @@ def create_arg_parser(config_path=None):
           help='Host address for connection (default: minechat.dvmn.org)')
     parser.add('-p','--port', type=int, default=5000, env_var='PORT',
           help='Port number for connection (default: 5000)')
+    parser.add('--filepath', type=str, default='./', env_var='FILEPATH',
+          help='Filepath for read and save messages (default: ./)')
     parser.add('-u', '--username', type=str, default='', env_var='USERNAME',
           help='Username for authentication (default: empty string)')
     parser.add('--text', type=str, required=True, env_var='TEXT', 

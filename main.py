@@ -29,6 +29,15 @@ async def read_msgs(host, port, filepath, queue, save_queue):
         await save_queue.put(frmt_message)
         
 
+async def save_messages(filepath, queue):
+    while True:
+        msg = await queue.get()
+        if filepath:
+            with open(filepath, 'a') as f:
+                f.write(f'{msg}\n')
+                queue.task_done()
+
+                
 async def main():
 
     config_path = ['./configs/reader.ini']

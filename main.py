@@ -45,9 +45,11 @@ async def send_messages(host, port, queue):
 
 async def main():
 
-    config_path = ['./configs/reader.ini']
-    arg_parser = create_arg_parser(config_path)
-    arguments = get_parse_arguments(arg_parser)
+    config_path = ['./configs/reader.ini', './configs/sender.ini']
+    send_parser = create_arg_parser(config_path[1])
+    arg_parser = create_arg_parser(config_path[0])
+    read_arguments = get_parse_arguments(arg_parser)
+    send_arguments = get_parse_arguments(send_parser)
 
     messages_queue = asyncio.Queue() 
     save_messages_queue = asyncio.Queue()
@@ -55,9 +57,9 @@ async def main():
     status_updates_queue = asyncio.Queue()
 
     draw_task = asyncio.create_task(gui.draw(messages_queue, sending_queue, status_updates_queue))
-    read_task = asyncio.create_task(read_msgs(arguments.host, arguments.port, arguments.filepath, messages_queue, save_messages_queue))
-    save_task = asyncio.create_task(save_messages(arguments.filepath, save_messages_queue))
-    send_task = asyncio.create_task(send_messages(arguments.host, arguments.port, sending_queue))
+    read_task = asyncio.create_task(read_msgs(read_arguments.host, read_arguments.port, read_arguments.filepath, messages_queue, save_messages_queue))
+    save_task = asyncio.create_task(save_messages(read_arguments.filepath, save_messages_queue))
+    send_task = asyncio.create_task(send_messages(send_arguments.host, send_arguments.port, sending_queue))
 
     await asyncio.gather(draw_task, read_task, save_task, send_task)
 

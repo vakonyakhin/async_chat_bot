@@ -17,7 +17,6 @@ async def read_msgs(host, port, filepath, queue, save_queue):
     reader, _ = await asyncio.open_connection(host, port)
     if filepath:
         await read_logs(filepath, queue)
-        print(f'Размер очереди после считывания истории сообщений {queue.qsize()}')
 
     while True:
         message = await reader.readline()
@@ -25,7 +24,6 @@ async def read_msgs(host, port, filepath, queue, save_queue):
         frmt_message = f'{now} {message.decode().strip()}'
 
         await queue.put(frmt_message)
-        print(queue.qsize())
         await save_queue.put(frmt_message)
 
 
@@ -36,6 +34,13 @@ async def save_messages(filepath, queue):
             with open(filepath, 'a') as f:
                 f.write(f'{msg}\n')
                 queue.task_done()
+
+
+async def send_messages(host, port, queue):
+
+    while True:
+        msg = await queue.get()
+        print(f'{msg}')
 
 
 async def main():
@@ -52,8 +57,9 @@ async def main():
     draw_task = asyncio.create_task(gui.draw(messages_queue, sending_queue, status_updates_queue))
     read_task = asyncio.create_task(read_msgs(arguments.host, arguments.port, arguments.filepath, messages_queue, save_messages_queue))
     save_task = asyncio.create_task(save_messages(arguments.filepath, save_messages_queue))
+    send_task = asyncio.create_task(send_messages(arguments.host, arguments.port, sending_queue))
 
-    await asyncio.gather(draw_task,read_task, save_task)
+    await asyncio.gather(draw_task, read_task, save_task, send_task)
 
 
 if __name__ == "__main__":

@@ -1,27 +1,40 @@
 import asyncio
 from datetime import datetime
+import tkinter as tk
+import sys
 
 import gui
 from chat_tools import get_logger, create_arg_parser, get_parse_arguments, read_token
 
 
-async def authentication(reader, writer):
-    
-    token = read_token()
-    
+async def authentication(reader, writer, token, status_queue):
+    if not token:
+        token = read_token()
+            
     logger.debug('Send token to server')
-    writer.write(f'{token['account_hash']}\n'.encode())
+    writer.write(f'{token}\n'.encode())
 
     await writer.drain()
-
+    InvalidToken = Exception('Invalid token')
     response_data = await reader.readline()
-    if response_data.decode().strip() == 'null':
-        print('Your token is incorrect. Please launch registration.py again')
-        return False    
-    else:
-        print(f'Выполнена авторизация. Пользователь {token['nickname']}')
+    
+    try:
+        if response_data.decode().strip() == 'null':
+            
+            tk.messagebox.showinfo('Неверный токен', 'Проверьте токен, сервер его не узнал')
+            raise InvalidToken
+        else:
+            username = json.loads(response_data.decode())['nickname']
+            print(f'Выполнена аутентификация. Пользователь {username}')
 
-    return token['nickname']
+    except InvalidToken:
+        logger.debug(f'Exit client. Invalid token')
+        sys.exit()
+    nickname = {key : value for key, value in response_data.decode().strip()}
+    print(type(nickname))
+    status_queue.put_nowait(gui.NicknameReceived(username))
+    return username
+
 
 
 async def read_logs(filepath, queue):
@@ -96,7 +109,7 @@ async def main():
     read_task = asyncio.create_task(read_msgs(read_arguments.host, read_arguments.port, read_arguments.filepath, messages_queue, save_messages_queue))
     save_task = asyncio.create_task(save_messages(read_arguments.filepath, save_messages_queue))
     send_task = asyncio.create_task(send_messages(send_arguments.host, send_arguments.port, sending_queue, save_messages_queue, messages_queue))
-    #auth_task = asyncio.create_task(authentication(reader,writer))
+    auth_task = asyncio.create_task(authentication(reader,writer))
 
     await asyncio.gather(draw_task, read_task, save_task, send_task)
 

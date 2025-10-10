@@ -1,10 +1,14 @@
-version: 1
+version: 2
 formatters:
   first:
     format: '%(levelname)s:%(name)s:%(message)s'
 
   second: 
     format: '%(asctime)s %(message)s'
+    datefmt: '[%d.%m.%Y %H:%M]'
+
+  third:
+    format: '%(timestamp)s %(message)s'
     datefmt: '[%d.%m.%Y %H:%M]'
 
 handlers:
@@ -22,11 +26,19 @@ handlers:
     filename: reader.log
     mode: 'a'
 
+  watch:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: second
+    filename: watch.log
+    mode: 'a'
+
   default:
     class: logging.FileHandler
     level: DEBUG
     filename: default.log
     mode: 'w'
+
 
 loggers:
   sender:
@@ -38,6 +50,11 @@ loggers:
     level: DEBUG
     handlers: [rm]
     propagate: no
+
+  watchd:
+    level: DEBUG
+    hander: [watch]
+    propagate: no 
 
   default:
     level: DEBUG

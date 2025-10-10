@@ -45,10 +45,11 @@ async def read_logs(filepath, queue):
     return
 
 
-async def read_msgs(host, port, filepath, queue, save_queue):
-
+async def read_msgs(host, port, filepath, queue, save_queue, status_queue):
+    status_queue.put_nowait(gui.ReadConnectionStateChanged.INITIATED)
     reader, _ = await asyncio.open_connection(host, port)
-
+    if reader:
+        status_queue.put_nowait(gui.ReadConnectionStateChanged.ESTABLISHED)
     if filepath:
         await read_logs(filepath, queue)
 
@@ -70,12 +71,13 @@ async def save_messages(filepath, queue):
                 queue.task_done()
 
 
-async def send_messages(host, port, send_queue, save_queue, message_queue):
-    
+async def send_messages(host, port, send_queue, save_queue, message_queue, status_queue):
+    status_queue.put_nowait(gui.SendingConnectionStateChanged.INITIATED)
     reader, writer = await asyncio.open_connection(host, port)
     await reader.readline()
 
     if reader and writer:
+        status_queue.put_nowait(gui.SendingConnectionStateChanged.ESTABLISHED)
         logger.debug('Do authentification')
         username = await authentication(reader, writer)
 
@@ -111,7 +113,7 @@ async def main():
     send_task = asyncio.create_task(send_messages(send_arguments.host, send_arguments.port, sending_queue, save_messages_queue, messages_queue))
     auth_task = asyncio.create_task(authentication(reader,writer))
 
-    await asyncio.gather(draw_task, read_task, save_task, send_task)
+    await asyncio.gather(auth_task, draw_task, read_task, save_task, send_task)
 
 
 if __name__ == "__main__":

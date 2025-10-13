@@ -1,4 +1,4 @@
-version: 2
+version: 1
 formatters:
   first:
     format: '%(levelname)s:%(name)s:%(message)s'

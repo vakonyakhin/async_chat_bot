@@ -4,7 +4,7 @@ from tkinter import messagebox
 import sys
 import json
 import socket
-import traceback
+
 
 import anyio
 from anyio import create_task_group, get_cancelled_exc_class
@@ -38,6 +38,25 @@ async def authentication(reader, writer, token, status_queue):
 
     status_queue.put_nowait(gui.NicknameReceived(username))
     return username
+
+
+async def ping_pong(host, port, token, status_queue, watch_queue):
+    
+    message = b'\n\n'
+    reader, writer = await asyncio.open_connection(host, port)
+    await reader.readline()
+
+    if reader and writer:
+        send_logger.debug('Do authentification')
+        username = await authentication(reader, writer, token, status_queue)
+        #status_queue.put_nowait(gui.SendingConnectionStateChanged.ESTABLISHED)
+        print({username})
+    while True:
+        writer.write(message)
+        await writer.drain()
+        print(f'Ping pong request to {host} {port}')
+        await watch_queue.put('ping')
+        await asyncio.sleep(3)
 
 
 async def read_logs(filepath, queue):
@@ -74,7 +93,7 @@ async def read_msgs(
 
             await queue.put(frmt_message)
             await watchdog_queue.put(f'{now} Connection is alive. New message in chat')
-
+            print(f'{now} Connection is alive. New message in chat')
             await save_queue.put(frmt_message)
 
 
@@ -113,7 +132,7 @@ async def send_messages(
         message = await send_queue.get()
         print(f'{message}')
         writer.write(f'{message}\n\n'.encode())
-        writer.drain()
+        await writer.drain()
         now = datetime.now().strftime('[%d.%m.%Y %H:%M:%S]')
         frmt_message = f'{now} {username}: {message}'
 
@@ -126,7 +145,7 @@ async def watch_for_connection(watchdog_queue):
     while True:
         try:
 
-            async with asyncio.timeout(5):
+            async with asyncio.timeout(15):
                 message = await watchdog_queue.get()
                 times = datetime.timestamp(datetime.now())
                 watch_logger.debug(f'{times} {message}')
@@ -165,8 +184,6 @@ async def handle_connections(
         status_updates_queue: Очередь для обновления статуса
         watchdog_queue: Очередь для отслеживания состояния подключения
     """
-    
-    
     max_retries = 5
     retry_delay = 5
     while True:
@@ -198,88 +215,41 @@ async def handle_connections(
                     watchdog_queue
                 )
                 task_group.start_soon(watch_for_connection, watchdog_queue)
+
+                task_group.start_soon(
+                    ping_pong,
+                    send_host,
+                    send_port,
+                    send_token,
+                    status_updates_queue,
+                    watchdog_queue
+                )
         except* (anyio.get_cancelled_exc_class(), socket.gaierror, Exception) as exc:
             for e in exc.exceptions:
-                print(f"Connection failed: {e}, waiting for tasks to complete...")
-                print(f"  Contained exception: {type(e).__name__}: {e}")
-                print("All tasks in the previous group have been cancelled")
-            
+                print(f"Connection failed, waiting for tasks to complete...")
+                #if e.errno == -3:
+                    #print('Cannot convert a website or servers domain name into an IP address')
+                #print(f"Contained exception: {type(e).__name__}: {e}")
+   
             # Ограничиваем количество попыток
                 max_retries -= 1
                 if max_retries <= 0:
                     print("Max retry attempts reached, exiting...")
                     break
-                
-            # Добавляем прогрессивную задержку
-            # retry_delay = min(retry_delay * 2, 60)  # Максимум 60 секунд
-            # print(f"Waiting {retry_delay} seconds before next attempt...")
+
+            # Ожидаем завершения всех задач в группе
             await anyio.sleep(retry_delay)
             
-        # except socket.gaierror as e:
-        #     print(f"DNS resolution error: {e}. Host: {e.hostname if hasattr(e, 'hostname') else 'unknown'}. Retrying in {retry_delay} seconds...")
-            
-        #     max_retries -= 1
-        #     if max_retries <= 0:
-        #         print("Max retry attempts reached, exiting...")
-        #         break
-                
-        # #     # Попробуем разрешить имя вручную
-        # #     try:
-        # #         resolved_ip = await anyio.to_thread.run_sync(socket.gethostbyname, read_host)
-        # #         print(f"Resolved {read_host} to {resolved_ip}")
-        # #     except Exception as resolve_err:
-        # #         print(f"Manual resolution failed: {resolve_err}")
-        # #         print("Traceback:")
-        # #         print(traceback.format_exc())
-                
-        # #     await anyio.sleep(retry_delay)
-
-            
-        # except Exception as e:
-        #     print(f"Unexpected error: {e}, waiting for tasks to complete...")
-        #     print("Full traceback:")
-        #     print(traceback.format_exc())
-        #     print("All tasks in the previous group have been cancelled")
-            
-        #     max_retries -= 1
-        #     if max_retries <= 0:
-        #         print("Max retry attempts reached, exiting...")
-        #         break
-                
-        #     print(f"Waiting {retry_delay} seconds before next attempt...")
-        #     await anyio.sleep(retry_delay)
         finally:
             print(f'max_retries = {max_retries}')
             if max_retries <= 0:
-                messagebox.showinfo('Отсутстувет пожключение.','Количество попыток соединение превышено. Проверьте соединение или повторите позже')
+                messagebox.showinfo('Отсутстувет подключение к интернету.', 
+                                    'Количество попыток соединение превышено. Проверьте соединение или повторите позже.'
+                                    )
                 sys.exit()
         # После завершения группы задач переходим к следующему циклу
         print("Restarting connections...")
-        # except get_cancelled_exc_class():
-
-        #     print('CancelledError for all tasks')
-        #     task_group.cancel_scope.cancel()
-        #     raise
-
-        # except* (socket.gaierror, ConnectionError,ConnectionResetError, ConnectionRefusedError, get_cancelled_exc_class()):
-        #     print(f'Ошибка подключения: отсутствует соединение с роутером. Проверьте подключение к интернету.')
-        #     #raise get_cancelled_exc_class()
-        #     print('CancelledError for all tasks')
-        #     task_group.cancel_scope.cancel()
-        #     raise
-            
-        # finally:
-        #     print('Closing all connections...')
-        #     status_updates_queue.put_nowait(gui.SendingConnectionStateChanged.CLOSED)
-        #     status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.CLOSED)
-        #     if max_attemtp <= 0:
-        #         break
-        #     max_attemtp -= 1
-            
-        # for sec in reversed(range(retry_delay)):
-        #     print(f"Restarting connections with {sec} seconds delay...")
-        #     await asyncio.sleep(1)
-
+       
 
 async def main():
 
@@ -327,4 +297,13 @@ if __name__ == "__main__":
     read_logger = get_logger('reader')
     send_logger = get_logger('sender')
     watch_logger = get_logger('watch')
-    asyncio.run(main())
+    
+    try:
+        asyncio.run(main())
+    except* (
+        KeyboardInterrupt,
+        gui.TkAppClosed
+    ) as err:
+        for e in err.exceptions:
+            print('KeyboardInterrupt')
+            sys.exit()

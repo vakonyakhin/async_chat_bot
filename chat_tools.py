@@ -3,7 +3,12 @@ import logging.config
 import yaml
 import configargparse
 import json
+import asyncio
 
+
+
+class InvalidToken(Exception):
+    pass
 
 def get_logger(name):
     """
@@ -65,7 +70,7 @@ def create_arg_parser(config_path=None):
           help='Filepath for read and save messages (default: ./)')
     parser.add('-u', '--username', type=str, default='', env_var='USERNAME',
           help='Username for authentication (default: empty string)')
-    parser.add('--text', type=str, required=True, env_var='TEXT', 
+    parser.add('--text', type=str, env_var='TEXT', default='',
           help='Required text parameter that must be passed on the command line.')
     parser.add('-t', '--token', type=str, default='', env_var='TOKEN',
           help='Authentication token (default: empty string)')
@@ -77,8 +82,19 @@ def get_parse_arguments(arg_parser):
     """Parses command line arguments."""
     return arg_parser.parse_args()
 
+
 def read_token():
 
     with open('token.json', 'r') as file:
         token = json.load(file)
     return token['account_hash']
+
+
+async def get_connection(config):
+    host = config.host
+    port = config.port
+
+
+    reader, writer = await asyncio.open_connection(host, port)
+
+    return [reader, writer]

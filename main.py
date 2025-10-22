@@ -10,7 +10,12 @@ import anyio
 from anyio import create_task_group, get_cancelled_exc_class
 
 import gui
-from chat_tools import get_logger, create_arg_parser, get_parse_arguments, read_token
+from chat_tools import (
+    get_logger,
+    create_arg_parser,
+    get_parse_arguments,
+    read_token
+)
 
 
 async def authentication(reader, writer, token, status_queue):
@@ -27,7 +32,10 @@ async def authentication(reader, writer, token, status_queue):
     try:
         if response_data.decode().strip() == 'null':
 
-            messagebox.showinfo('Неверный токен', 'Проверьте токен, сервер его не узнал')
+            messagebox.showinfo(
+                'Неверный токен',
+                'Проверьте токен, сервер его не узнал'
+                )
             raise InvalidToken
         else:
             username = json.loads(response_data.decode())['nickname']
@@ -41,7 +49,7 @@ async def authentication(reader, writer, token, status_queue):
 
 
 async def ping_pong(host, port, token, status_queue, watch_queue):
-    
+
     message = b'\n\n'
     reader, writer = await asyncio.open_connection(host, port)
     await reader.readline()
@@ -119,7 +127,7 @@ async def send_messages(
 
     status_queue.put_nowait(gui.SendingConnectionStateChanged.INITIATED)
     reader, writer = await asyncio.open_connection(host, port)
-    
+
     await reader.readline()
 
     if reader and writer:
@@ -230,7 +238,7 @@ async def handle_connections(
                 #if e.errno == -3:
                     #print('Cannot convert a website or servers domain name into an IP address')
                 #print(f"Contained exception: {type(e).__name__}: {e}")
-   
+
             # Ограничиваем количество попыток
                 max_retries -= 1
                 if max_retries <= 0:
@@ -239,17 +247,19 @@ async def handle_connections(
 
             # Ожидаем завершения всех задач в группе
             await anyio.sleep(retry_delay)
-            
+
         finally:
             print(f'max_retries = {max_retries}')
             if max_retries <= 0:
-                messagebox.showinfo('Отсутстувет подключение к интернету.', 
-                                    'Количество попыток соединение превышено. Проверьте соединение или повторите позже.'
-                                    )
+                messagebox.showinfo(
+                    'Отсутстувет подключение к интернету.', 
+                    'Количество попыток соединение превышено. ' \
+                    'Проверьте соединение или повторите позже.'
+                    )
                 sys.exit()
         # После завершения группы задач переходим к следующему циклу
         print("Restarting connections...")
-       
+
 
 async def main():
 
@@ -297,7 +307,7 @@ if __name__ == "__main__":
     read_logger = get_logger('reader')
     send_logger = get_logger('sender')
     watch_logger = get_logger('watch')
-    
+
     try:
         asyncio.run(main())
     except* (

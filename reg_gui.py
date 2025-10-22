@@ -10,7 +10,6 @@ from chat_tools import (
     get_parse_arguments,
     get_connection
 )
-
 from gui import update_tk, TkAppClosed
 
 
@@ -21,15 +20,15 @@ async def registration(reg_queue, args):
             username = await reg_queue.get()
 
             if not username:
-                print('Queue is empty')
+                logger.debug('Queue is empty')
 
             else:
 
                 reader, writer = await get_connection(args)
                 if reader:
-                    print(await reader.readline())
+                    logger.debug(await reader.readline())
                     writer.write(b'\n')
-                    print(await reader.readline())
+                    logger.debug(await reader.readline())
 
                     writer.write(f'{username}\n'.encode())
 
@@ -38,23 +37,22 @@ async def registration(reg_queue, args):
                     await reader.readline()
                     await writer.drain()
 
-                    print('Get token')
+                    logger.debug('Get token')
                     token = json.loads(response.decode())
                     if token:
                         with open('token.json', 'w') as file:
-                            print('Safe token to file')
+                            logger.debug('Safe token to file')
                             json.dump(token, file, indent=4)
                             messagebox.showinfo('Done','Вы зарегистрированы!')
 
         except OSError:
-            print('Отсутствуте соединение')   
+            logger.debug('Отсутствуте соединение')   
         except json.JSONDecodeError:
-            print('JSON decoding error')
+            logger.debug('JSON decoding error')
             messagebox.showerror('Token error','Ошибка чтения токена. Повторите попытку')
 
         finally:
-            
-            print('Close connection')
+            logger.debug('Close connection')
             raise TkAppClosed()
 
 
@@ -107,7 +105,7 @@ async def main(args):
             )
     except* (asyncio.CancelledError, TkAppClosed, KeyboardInterrupt) as exc:
         for exc in exc.exceptions:
-            print(f'Cancelled tasks {exc}')
+            logger.debug(f'Cancelled tasks {exc}')
 
 
 if __name__ == '__main__':

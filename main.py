@@ -39,7 +39,7 @@ async def authentication(reader, writer, token, status_queue):
             raise InvalidToken
         else:
             username = json.loads(response_data.decode())['nickname']
-            print(f'Выполнена аутентификация. Пользователь {username}')
+            send_logger.debug(f'Выполнена аутентификация. Пользователь {username}')
 
     except InvalidToken:
         sys.exit()
@@ -58,11 +58,11 @@ async def ping_pong(host, port, token, status_queue, watch_queue):
         send_logger.debug('Do authentification')
         username = await authentication(reader, writer, token, status_queue)
         #status_queue.put_nowait(gui.SendingConnectionStateChanged.ESTABLISHED)
-        print({username})
+        send_logger.debug({username})
     while True:
         writer.write(message)
         await writer.drain()
-        print(f'Ping pong request to {host} {port}')
+        send_logger.debug(f'Ping pong request to {host} {port}')
         await watch_queue.put('ping')
         await asyncio.sleep(3)
 
@@ -101,7 +101,7 @@ async def read_msgs(
 
             await queue.put(frmt_message)
             await watchdog_queue.put(f'{now} Connection is alive. New message in chat')
-            print(f'{now} Connection is alive. New message in chat')
+            read_logger.debug(f'{now} Connection is alive. New message in chat')
             await save_queue.put(frmt_message)
 
 
@@ -138,7 +138,7 @@ async def send_messages(
     send_logger.debug(await reader.readline())
     while True:
         message = await send_queue.get()
-        print(f'{message}')
+        send_logger.debug(f'{message}')
         writer.write(f'{message}\n\n'.encode())
         await writer.drain()
         now = datetime.now().strftime('[%d.%m.%Y %H:%M:%S]')
@@ -159,7 +159,7 @@ async def watch_for_connection(watchdog_queue):
                 watch_logger.debug(f'{times} {message}')
 
         except TimeoutError:
-            print(f'{datetime.timestamp(datetime.now())} TimeoutError')
+            watch_logger.debug(f'{datetime.timestamp(datetime.now())} TimeoutError')
             raise get_cancelled_exc_class()
 
 
@@ -196,7 +196,7 @@ async def handle_connections(
     retry_delay = 5
     while True:
 
-        print("Starting new connection cycle")
+        default_logger.debug("Starting new connection cycle")
 
         try:
             async with create_task_group() as task_group:
@@ -234,7 +234,7 @@ async def handle_connections(
                 )
         except* (anyio.get_cancelled_exc_class(), socket.gaierror, Exception) as exc:
             for e in exc.exceptions:
-                print(f"Connection failed, waiting for tasks to complete...")
+                default_logger.debug(f"Connection failed, waiting for tasks to complete...")
                 #if e.errno == -3:
                     #print('Cannot convert a website or servers domain name into an IP address')
                 #print(f"Contained exception: {type(e).__name__}: {e}")
@@ -242,14 +242,14 @@ async def handle_connections(
             # Ограничиваем количество попыток
                 max_retries -= 1
                 if max_retries <= 0:
-                    print("Max retry attempts reached, exiting...")
+                    default_logger.debug("Max retry attempts reached, exiting...")
                     break
 
             # Ожидаем завершения всех задач в группе
             await anyio.sleep(retry_delay)
 
         finally:
-            print(f'max_retries = {max_retries}')
+            default_logger.debug(f'max_retries = {max_retries}')
             if max_retries <= 0:
                 messagebox.showinfo(
                     'Отсутстувет подключение к интернету.', 
@@ -258,7 +258,7 @@ async def handle_connections(
                     )
                 sys.exit()
         # После завершения группы задач переходим к следующему циклу
-        print("Restarting connections...")
+        default_logger.debug("Restarting connections...")
 
 
 async def main():
@@ -307,6 +307,7 @@ if __name__ == "__main__":
     read_logger = get_logger('reader')
     send_logger = get_logger('sender')
     watch_logger = get_logger('watch')
+    default_logger = get_logger('default')
 
     try:
         asyncio.run(main())
@@ -315,5 +316,5 @@ if __name__ == "__main__":
         gui.TkAppClosed
     ) as err:
         for e in err.exceptions:
-            print('KeyboardInterrupt')
+            default_logger.debug('KeyboardInterrupt')
             sys.exit()

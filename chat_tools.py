@@ -6,9 +6,9 @@ import json
 import asyncio
 
 
-
 class InvalidToken(Exception):
     pass
+
 
 def get_logger(name):
     """
@@ -93,7 +93,6 @@ def read_token():
 async def get_connection(config):
     host = config.host
     port = config.port
-
 
     reader, writer = await asyncio.open_connection(host, port)
 

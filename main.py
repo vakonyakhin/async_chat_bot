@@ -300,7 +300,7 @@ async def handle_connections(
 
         except* (get_cancelled_exc_class, socket.gaierror, Exception) as exc:
             for sub in exc.exceptions:
-                default_logger.debug(f"Разрыв соединения. Connection task raised: {sub!r}")
+                get_logger('default').debug(f"Разрыв соединения. Connection task raised: {sub!r}")
 
         finally:
             status_updates_queue.put_nowait(

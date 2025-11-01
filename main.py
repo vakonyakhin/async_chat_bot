@@ -24,6 +24,22 @@ class InvalidToken(Exception):
 
 @with_logger('sender')
 async def authentication(logger, reader, writer, token, status_queue):
+    """
+    Аутентифицирует пользователя на сервере чата.
+
+    Args:
+        logger: Экземпляр логгера.
+        reader: StreamReader для получения ответов от сервера.
+        writer: StreamWriter для отправки данных на сервер.
+        token: Токен аутентификации. Если None, токен будет прочитан из файла.
+        status_queue: Очередь для отправки обновлений статуса в GUI.
+
+    Returns:
+        Кортеж (username, reader, writer) в случае успеха.
+
+    Raises:
+        InvalidToken: Если сервер вернул `null` в ответ на токен.
+    """
     if not token:
         token = read_token()
 
@@ -53,6 +69,13 @@ async def authentication(logger, reader, writer, token, status_queue):
 
 
 async def read_logs(filepath, queue):
+    """
+    Загружает историю сообщений из файла.
+
+    Args:
+        filepath: Путь к файлу с логами.
+        queue: Очередь для добавления отформатированных сообщений.
+    """
     if filepath:
         with open(filepath, 'r') as f:
             for line in f:
@@ -69,6 +92,18 @@ async def read_msgs(
         status_queue,
         watchdog_queue
         ):
+    """
+    Читает входящие сообщения из сокета и помещает их в очередь.
+
+    Args:
+        reader: StreamReader для чтения сообщений из сети.
+        writer: StreamWriter (не используется напрямую, но нужен для сигнатуры).
+        filepath: Путь к файлу для загрузки истории сообщений.
+        queue: Основная очередь сообщений для отображения в GUI.
+        save_queue: Очередь для сохранения сообщений в файл.
+        status_queue: Очередь для обновления статуса соединения в GUI.
+        watchdog_queue: Очередь для мониторинга активности соединения.
+    """
 
     status_queue.put_nowait(gui.ReadConnectionStateChanged.INITIATED)
 
@@ -90,6 +125,13 @@ async def read_msgs(
 
 
 async def save_messages(filepath, queue):
+    """
+    Сохраняет сообщения из очереди в файл.
+
+    Args:
+        filepath: Путь к файлу для сохранения.
+        queue: Очередь с сообщениями для сохранения.
+    """
     while True:
         msg = await queue.get()
         if filepath:
@@ -107,6 +149,18 @@ async def send_messages(
         status_queue,
         watchdog_queue
         ):
+    """
+    Отправляет сообщения пользователя на сервер.
+
+    Args:
+        logger: Экземпляр логгера.
+        writer: StreamWriter для отправки сообщений в сеть.
+        username: Имя текущего пользователя.
+        send_queue: Очередь с сообщениями для отправки.
+        save_queue: Очередь для сохранения отправленных сообщений.
+        status_queue: Очередь для обновления статуса соединения в GUI.
+        watchdog_queue: Очередь для мониторинга активности соединения.
+    """
 
     status_queue.put_nowait(gui.SendingConnectionStateChanged.INITIATED)
 
@@ -127,6 +181,16 @@ async def send_messages(
 
 @with_logger('watcher')
 async def watch_for_connection(logger, watchdog_queue):
+    """
+    Следит за состоянием соединения, ожидая сообщений в watchdog_queue.
+
+    Если в течение таймаута не поступает ни одного сообщения,
+    вызывает исключение, что приводит к перезапуску соединения.
+
+    Args:
+        logger: Экземпляр логгера.
+        watchdog_queue: Очередь для получения сообщений о состоянии соединения.
+    """
 
     while True:
         try:
@@ -142,6 +206,14 @@ async def watch_for_connection(logger, watchdog_queue):
 
 @with_logger('sender')
 async def ping_pong(logger, writer, watch_queue):
+    """
+    Поддерживает соединение активным, периодически отправляя ping-запросы (пустые строки).
+
+    Args:
+        logger: Экземпляр логгера.
+        writer: StreamWriter для отправки ping-сообщений.
+        watch_queue: Очередь для уведомления watchdog'а об активности.
+    """
 
     message = b'\n\n'
     timestamp = datetime.timestamp(datetime.now())
@@ -172,20 +244,17 @@ async def handle_connections(
     watchdog_queue
 ):
     """
-    Управляет подключениями и перезапускает задачи при сбоях.
+    Управляет жизненным циклом соединений, включая переподключение при сбоях.
 
     Args:
-        read_host: Хост для чтения сообщений
-        read_port: Порт для чтения сообщений
-        read_filepath: Путь к файлу для чтения логов
-        send_host: Хост для отправки сообщений
-        send_port: Порт для отправки сообщений
-        send_token: Токен для аутентификации
-        messages_queue: Очередь для входящих сообщений
-        save_messages_queue: Очередь для сохранения сообщений
-        sending_queue: Очередь для исходящих сообщений
-        status_updates_queue: Очередь для обновления статуса
-        watchdog_queue: Очередь для отслеживания состояния подключения
+        logger: Экземпляр логгера.
+        read_parcer: Конфигурация для соединения на чтение.
+        send_parcer: Конфигурация для соединения на отправку.
+        messages_queue: Очередь для сообщений, отображаемых в GUI.
+        save_messages_queue: Очередь для сообщений, сохраняемых в файл.
+        sending_queue: Очередь для сообщений, отправляемых на сервер.
+        status_updates_queue: Очередь для обновления статусов в GUI.
+        watchdog_queue: Очередь для мониторинга активности соединения.
     """
     max_retries = 5
     retry_delay = 5
@@ -259,6 +328,12 @@ async def handle_connections(
 
 @with_logger('default')
 async def main(logger):
+    """
+    Главная точка входа в приложение.
+
+    Инициализирует парсеры аргументов, очереди и запускает основные задачи:
+    обработчик соединений, GUI и сохранение сообщений.
+    """
 
     config_reader_path = ['./configs/reader.ini']
     config_sender_path = ['./configs/sender.ini']

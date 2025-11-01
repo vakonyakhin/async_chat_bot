@@ -15,6 +15,13 @@ def get_logger(name):
     """
     Возвращает именованный экземпляр логгера.
     Конфигурация логирования будет применена при первом вызове.
+
+    Args:
+        name (str): Имя логгера.
+
+    Returns:
+        logging.Logger: Сконфигурированный экземпляр логгера.
+
     """
     _configure_logging()
     return logging.getLogger(name)
@@ -23,6 +30,12 @@ def get_logger(name):
 def with_logger(name):
     """
     Декоратор, который внедряет логгер в качестве первого аргумента в оборачиваемую функцию.
+
+    Args:
+        name (str): Имя логгера, который будет создан и передан.
+
+    Returns:
+        Callable: Асинхронная функция-обертка.
     """
     def decorator(func):
         @functools.wraps(func)
@@ -36,24 +49,14 @@ def with_logger(name):
 @functools.lru_cache(maxsize=1)
 def _configure_logging():
     """
-    Configure and return a logger instance based on a YAML configuration file.
+    Загружает и применяет конфигурацию логирования из файла 'logger_config.yaml'.
 
-    This function:
-    1. Loads logging configuration from 'logger_config.yaml'.
-    2. Applies the configuration using `logging.config.dictConfig()`.
-    3. Returns a named logger instance as specified by the `name` argument.
-
-    Args:
-        name (str): Name of the logger to retrieve. Typically corresponds to the module name
-                    or a custom identifier for the logging context.
-
-    Returns:
-        logging.Logger: A configured logger instance ready for use.
+    Функция выполняется только один раз благодаря декоратору `lru_cache`.
 
     Raises:
-        FileNotFoundError: If 'logger_config.yaml' does not exist.
-        yaml.YAMLError: If the YAML file contains invalid syntax or structure.
-        ValueError: If the logging configuration dictionary is invalid.
+        FileNotFoundError: Если файл 'logger_config.yaml' не найден.
+        yaml.YAMLError: Если файл YAML содержит некорректный синтаксис.
+        ValueError: Если словарь конфигурации логирования невалиден.
     """
     try:
         with open('logger_config.yaml', 'r') as file:
@@ -69,11 +72,15 @@ def _configure_logging():
 
 def create_arg_parser(config_path=None):
 
-    """
-    Creates and returns an instance of the ArgParser configured to load parameters from the specified configuration file.
+    """Создает и возвращает парсер аргументов командной строки.
 
-    :param config_paths: List of paths to configuration files.
-    :return: Configured ArgParser.
+    Парсер настроен для загрузки параметров из указанного конфигурационного файла.
+
+    Args:
+        config_path (list, optional): Список путей к файлам конфигурации. Defaults to None.
+
+    Returns:
+        configargparse.ArgParser: Сконфигурированный парсер.
     """
     parser = configargparse.ArgParser(
         description='TCP client for interacting with a chat server.',
@@ -99,12 +106,26 @@ def create_arg_parser(config_path=None):
 
 
 def get_parse_arguments(arg_parser):
-    """Parses command line arguments."""
+    """
+    Разбирает аргументы командной строки с помощью предоставленного парсера.
+
+    Args:
+        arg_parser (configargparse.ArgParser): Экземпляр парсера.
+
+    Returns:
+        argparse.Namespace: Объект с разобранными аргументами.
+    """
     return arg_parser.parse_args()
 
 
 def read_token():
+    """
+    Читает токен аутентификации из файла 'token.json'.
 
+    Returns:
+        str: Значение ключа 'account_hash' из JSON-файла.
+
+    """
     with open('token.json', 'r') as file:
         token = json.load(file)
     return token['account_hash']
@@ -113,6 +134,16 @@ def read_token():
 async def get_connection(config):
     host = config.host
     port = config.port
+    """
+    Устанавливает асинхронное сетевое соединение.
+
+    Args:
+        config (argparse.Namespace): Объект конфигурации, содержащий `host` и `port`.
+
+    Returns:
+        list: Кортеж из (StreamReader, StreamWriter).
+
+    """
 
     reader, writer = await asyncio.open_connection(host, port)
 

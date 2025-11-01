@@ -5,7 +5,7 @@ import asyncio
 import json
 
 from chat_tools import (
-    get_logger, 
+    get_logger,
     create_arg_parser,
     get_parse_arguments,
     get_connection
@@ -109,7 +109,7 @@ async def main(args):
 
 
 if __name__ == '__main__':
-    logger = get_logger('second')
+    logger = get_logger('sender')
     config_path = ['./configs/reg.ini']
     arg_parser = create_arg_parser(config_path)
     arguments = get_parse_arguments(arg_parser)

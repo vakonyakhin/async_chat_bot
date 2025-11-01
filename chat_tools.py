@@ -4,6 +4,7 @@ import yaml
 import configargparse
 import json
 import asyncio
+import functools
 
 
 class InvalidToken(Exception):
@@ -11,6 +12,29 @@ class InvalidToken(Exception):
 
 
 def get_logger(name):
+    """
+    Возвращает именованный экземпляр логгера.
+    Конфигурация логирования будет применена при первом вызове.
+    """
+    _configure_logging()
+    return logging.getLogger(name)
+
+
+def with_logger(name):
+    """
+    Декоратор, который внедряет логгер в качестве первого аргумента в оборачиваемую функцию.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            logger = get_logger(name)
+            return await func(logger, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+@functools.lru_cache(maxsize=1)
+def _configure_logging():
     """
     Configure and return a logger instance based on a YAML configuration file.
 
@@ -34,17 +58,13 @@ def get_logger(name):
     try:
         with open('logger_config.yaml', 'r') as file:
             logger_config = yaml.safe_load(file)
-
         logging.config.dictConfig(logger_config)
-
     except FileNotFoundError:
         print('Logger_config.yaml does not exist.')
     except yaml.YAMLError:
         print('YAML file contains invalid syntax or structure')
     except ValueError:
         print('Logging configuration dictionary is invalid.')
-
-    return logging.getLogger(name)
 
 
 def create_arg_parser(config_path=None):

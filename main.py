@@ -13,7 +13,8 @@ from chat_tools import (
     create_arg_parser,
     get_parse_arguments,
     read_token,
-    get_connection
+    get_connection,
+    with_logger
 )
 
 
@@ -21,18 +22,19 @@ class InvalidToken(Exception):
     pass
 
 
-async def authentication(reader, writer, token, status_queue):
+@with_logger('sender')
+async def authentication(logger, reader, writer, token, status_queue):
     if not token:
         token = read_token()
 
     await reader.readline()
-    send_logger.debug('Отправка токена на сервер')
+    logger.debug('Отправка токена на сервер')
     writer.write(f'{token}\n'.encode())
 
     await writer.drain()
 
     response_data = await reader.readline()
-    send_logger.debug(await reader.readline())
+    logger.debug(await reader.readline())
     try:
         if response_data.decode().strip() == 'null':
 
@@ -43,7 +45,7 @@ async def authentication(reader, writer, token, status_queue):
             raise InvalidToken
         else:
             username = json.loads(response_data.decode())['nickname']
-            send_logger.debug(f'Выполнена аутентификация. Пользователь {username}')
+            logger.debug(f'Выполнена аутентификация. Пользователь {username}')
     except InvalidToken:
         sys.exit()
     status_queue.put_nowait(gui.NicknameReceived(username))
@@ -95,9 +97,9 @@ async def save_messages(filepath, queue):
                 f.write(f'{msg}\n')
                 queue.task_done()
 
-
+@with_logger('sender')
 async def send_messages(
-
+        logger,
         writer,
         username,
         send_queue,
@@ -113,7 +115,7 @@ async def send_messages(
 
     while True:
         message = await send_queue.get()
-        send_logger.debug(f'{message}')
+        logger.debug(f'{message}')
         writer.write(f'{message}\n\n'.encode())
         await writer.drain()
         now = datetime.now().strftime('[%d.%m.%Y %H:%M:%S]')
@@ -123,21 +125,23 @@ async def send_messages(
         watchdog_queue.put_nowait(f'Connection is alive. Message sent')
 
 
-async def watch_for_connection(watchdog_queue):
+@with_logger('watcher')
+async def watch_for_connection(logger, watchdog_queue):
 
     while True:
         try:
             async with asyncio.timeout(3):
                 message = await watchdog_queue.get()
                 timestamp = datetime.timestamp(datetime.now())
-                watch_logger.debug(f'{timestamp} {message}')
+                logger.debug(f'{timestamp} {message}')
 
         except TimeoutError:
-            watch_logger.debug(f'{timestamp} TimeoutError')
+            logger.debug(f'{datetime.timestamp(datetime.now())} TimeoutError')
             raise get_cancelled_exc_class()
 
 
-async def ping_pong(writer, watch_queue):
+@with_logger('sender')
+async def ping_pong(logger, writer, watch_queue):
 
     message = b'\n\n'
     timestamp = datetime.timestamp(datetime.now())
@@ -147,15 +151,18 @@ async def ping_pong(writer, watch_queue):
             async with asyncio.timeout(3):
                 writer.write(message)
                 await writer.drain()
-                send_logger.debug(f'Ping pong request to server')
+                logger.debug(f'Ping pong request to server')
             await watch_queue.put('ping')
             await asyncio.sleep(10)
         except TimeoutError:
-            watch_logger.debug(f'{timestamp} TimeoutError')
+            # Используем логгер 'watcher' для этого сообщения
+            get_logger('watcher').debug(f'{timestamp} TimeoutError')
             raise get_cancelled_exc_class()
 
 
+@with_logger('default')
 async def handle_connections(
+    logger,
     read_parcer,
     send_parcer,
     messages_queue,
@@ -187,7 +194,7 @@ async def handle_connections(
         try:
             read_streams = await get_connection(read_parcer)
             write_streams = await get_connection(send_parcer)
-            default_logger.debug("Запуск коррутин....")
+            logger.debug("Запуск коррутин....")
 
             username, _ , writer = await authentication(
                 *write_streams,
@@ -219,7 +226,7 @@ async def handle_connections(
                 task_group.start_soon(
                     ping_pong,
                     writer,
-                    watchdog_queue
+                    watchdog_queue,
                 )
 
         except* (get_cancelled_exc_class, socket.gaierror, Exception) as exc:
@@ -234,9 +241,9 @@ async def handle_connections(
                 gui.SendingConnectionStateChanged.CLOSED
                 )
             max_retries -= 1
-            default_logger.debug(f'Оставшееся количество попыток = {max_retries}')
+            logger.debug(f'Оставшееся количество попыток = {max_retries}')
             if max_retries <= 0:
-                default_logger.debug("Использовано максимальное \
+                logger.debug("Использовано максимальное \
                                      количество попыток соединения....")
                 messagebox.showinfo(
                     'Отсутстувет подключение к интернету.', 
@@ -244,13 +251,14 @@ async def handle_connections(
                     'Проверьте соединение или повторите позже.'
                     )
                 sys.exit()
-            default_logger.debug('Ожидаем перед повторной попыткой')
+            logger.debug('Ожидаем перед повторной попыткой')
             await asyncio.sleep(retry_delay)
 
-        default_logger.debug("Переподключение")
+        logger.debug("Переподключение")
 
 
-async def main():
+@with_logger('default')
+async def main(logger):
 
     config_reader_path = ['./configs/reader.ini']
     config_sender_path = ['./configs/sender.ini']
@@ -289,24 +297,21 @@ async def main():
                 save_messages_queue
             )
     except* ExceptionGroup as err:
-        default_logger.debug(f'Unexcepter error in main {type(err).__name__}')
+        logger.debug(f'Unexcepter error in main {type(err).__name__}')
 
 if __name__ == "__main__":
-    read_logger = get_logger('reader')
-    send_logger = get_logger('sender')
-    watch_logger = get_logger('watcher')
-    default_logger = get_logger('default')
+    # Логгеры теперь создаются и внедряются декоратором
 
     try:
         asyncio.run(main())
     except (
         KeyboardInterrupt,
         gui.TkAppClosed
-    ):
-        default_logger.debug(f'Чат был закрыт пользователем')
+    ) as e:
+        get_logger('default').debug(f'Чат был закрыт пользователем: {type(e).__name__}')
 
     except ExceptionGroup as err:
         for err in err.exceptions:
-            default_logger.debug(f'Unexcepter error {type(err).__name__}')
+            get_logger('default').debug(f'Unexcepter error {type(err).__name__}')
     finally:
         sys.exit()

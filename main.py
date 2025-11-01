@@ -204,7 +204,7 @@ async def watch_for_connection(logger, watchdog_queue):
             raise get_cancelled_exc_class()
 
 
-@with_logger('sender')
+@with_logger('watcher')
 async def ping_pong(logger, writer, watch_queue):
     """
     Поддерживает соединение активным, периодически отправляя ping-запросы (пустые строки).
@@ -228,7 +228,7 @@ async def ping_pong(logger, writer, watch_queue):
             await asyncio.sleep(10)
         except TimeoutError:
             # Используем логгер 'watcher' для этого сообщения
-            get_logger('watcher').debug(f'{timestamp} TimeoutError')
+            logger.debug(f'{timestamp} TimeoutError')
             raise get_cancelled_exc_class()
 
 
@@ -258,7 +258,7 @@ async def handle_connections(
     """
     max_retries = 5
     retry_delay = 5
-    
+
     while True:
         try:
             read_streams = await get_connection(read_parcer)
@@ -271,7 +271,7 @@ async def handle_connections(
                 status_updates_queue
             )
             async with create_task_group() as task_group:
-                
+
                 task_group.start_soon(
                     read_msgs,
                     *read_streams,
@@ -300,7 +300,7 @@ async def handle_connections(
 
         except* (get_cancelled_exc_class, socket.gaierror, Exception) as exc:
             for sub in exc.exceptions:
-                get_logger('default').debug(f"Разрыв соединения. Connection task raised: {sub!r}")
+                logger.debug(f"Разрыв соединения. Connection task raised: {sub!r}")
 
         finally:
             status_updates_queue.put_nowait(
@@ -310,7 +310,6 @@ async def handle_connections(
                 gui.SendingConnectionStateChanged.CLOSED
                 )
             max_retries -= 1
-            logger.debug(f'Оставшееся количество попыток = {max_retries}')
             if max_retries <= 0:
                 logger.debug("Использовано максимальное \
                                      количество попыток соединения....")
@@ -320,9 +319,9 @@ async def handle_connections(
                     'Проверьте соединение или повторите позже.'
                     )
                 sys.exit()
-            logger.debug('Ожидаем перед повторной попыткой')
-            await asyncio.sleep(retry_delay)
-
+        logger.debug(f'Оставшееся количество попыток = {max_retries}')    
+        logger.debug('Ожидаем перед повторной попыткой')
+        await asyncio.sleep(retry_delay)
         logger.debug("Переподключение")
 
 

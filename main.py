@@ -26,7 +26,7 @@ async def authentication(reader, writer, token, status_queue):
         token = read_token()
 
     await reader.readline()
-    send_logger.debug('Send token to server')
+    send_logger.debug('Отправка токена на сервер')
     writer.write(f'{token}\n'.encode())
 
     await writer.drain()
@@ -40,7 +40,7 @@ async def authentication(reader, writer, token, status_queue):
                     'Неверный токен',
                     'Проверьте токен, сервер его не узнал'
                     )
-            raise InvalidToken()
+            raise InvalidToken
         else:
             username = json.loads(response_data.decode())['nickname']
             send_logger.debug(f'Выполнена аутентификация. Пользователь {username}')
@@ -48,19 +48,6 @@ async def authentication(reader, writer, token, status_queue):
         sys.exit()
     status_queue.put_nowait(gui.NicknameReceived(username))
     return username, reader, writer
-
-
-async def ping_pong(writer, watch_queue):
-
-    message = b'\n\n'
-
-    while True:
-        async with asyncio.timeout(10):
-            writer.write(message)
-            await writer.drain()
-            send_logger.debug(f'Ping pong request to server')
-            await watch_queue.put('ping')
-            await asyncio.sleep(5)
 
 
 async def read_logs(filepath, queue):
@@ -140,13 +127,31 @@ async def watch_for_connection(watchdog_queue):
 
     while True:
         try:
-            async with asyncio.timeout(15):
+            async with asyncio.timeout(3):
                 message = await watchdog_queue.get()
                 timestamp = datetime.timestamp(datetime.now())
                 watch_logger.debug(f'{timestamp} {message}')
 
         except TimeoutError:
-            watch_logger.debug(f'{datetime.timestamp(datetime.now())} TimeoutError')
+            watch_logger.debug(f'{timestamp} TimeoutError')
+            raise get_cancelled_exc_class()
+
+
+async def ping_pong(writer, watch_queue):
+
+    message = b'\n\n'
+    timestamp = datetime.timestamp(datetime.now())
+
+    while True:
+        try:
+            async with asyncio.timeout(3):
+                writer.write(message)
+                await writer.drain()
+                send_logger.debug(f'Ping pong request to server')
+            await watch_queue.put('ping')
+            await asyncio.sleep(10)
+        except TimeoutError:
+            watch_logger.debug(f'{timestamp} TimeoutError')
             raise get_cancelled_exc_class()
 
 
@@ -177,21 +182,20 @@ async def handle_connections(
     """
     max_retries = 5
     retry_delay = 5
+    
     while True:
-
-        read_streams = await get_connection(read_parcer)
-        write_streams = await get_connection(send_parcer)
-        default_logger.debug("Starting new connection cycle")
-
-        username, _ , writer = await authentication(
-            *write_streams,
-            send_parcer.token,
-            status_updates_queue
-        )
-
         try:
+            read_streams = await get_connection(read_parcer)
+            write_streams = await get_connection(send_parcer)
+            default_logger.debug("Запуск коррутин....")
+
+            username, _ , writer = await authentication(
+                *write_streams,
+                send_parcer.token,
+                status_updates_queue
+            )
             async with create_task_group() as task_group:
-                # Запуск основных задач
+                
                 task_group.start_soon(
                     read_msgs,
                     *read_streams,
@@ -219,32 +223,32 @@ async def handle_connections(
                 )
 
         except* (get_cancelled_exc_class, socket.gaierror, Exception) as exc:
-            # Log all sub-exceptions from the ExceptionGroup
             for sub in exc.exceptions:
-                default_logger.debug(f"Connection task raised: {sub!r}")
-
-            # Ограничиваем количество попыток (decrement once per failed cycle)
-            default_logger.debug("{max_retries} attempts remaining.")
-            max_retries -= 1
-            if max_retries <= 0:
-                default_logger.debug("Max retry attempts reached, exiting...")
+                default_logger.debug(f"Разрыв соединения. Connection task raised: {sub!r}")
 
         finally:
-            # Ожидаем перед повторной попыткой
-            await asyncio.sleep(retry_delay)
-            default_logger.debug(f'max_retries = {max_retries}')
+            status_updates_queue.put_nowait(
+                gui.ReadConnectionStateChanged.CLOSED
+                )
+            status_updates_queue.put_nowait(
+                gui.SendingConnectionStateChanged.CLOSED
+                )
+            max_retries -= 1
+            default_logger.debug(f'Оставшееся количество попыток = {max_retries}')
             if max_retries <= 0:
+                default_logger.debug("Использовано максимальное \
+                                     количество попыток соединения....")
                 messagebox.showinfo(
                     'Отсутстувет подключение к интернету.', 
                     'Количество попыток соединение превышено. ' \
                     'Проверьте соединение или повторите позже.'
                     )
                 sys.exit()
-        # После завершения группы задач переходим к следующему циклу
-        status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.CLOSED)
-        status_updates_queue.put_nowait(gui.SendingConnectionStateChanged.CLOSED)
-        default_logger.debug("Restarting connections...")
-        
+            default_logger.debug('Ожидаем перед повторной попыткой')
+            await asyncio.sleep(retry_delay)
+
+        default_logger.debug("Переподключение")
+
 
 async def main():
 
@@ -260,29 +264,32 @@ async def main():
     sending_queue = asyncio.Queue()
     status_updates_queue = asyncio.Queue()
     watchdog_queue = asyncio.Queue()
+    try:
+        async with create_task_group() as task_group:
 
-    async with create_task_group() as task_group:
-        task_group.start_soon(
-            handle_connections,
-            read_arguments,
-            send_arguments,
-            messages_queue,
-            save_messages_queue,
-            sending_queue,
-            status_updates_queue,
-            watchdog_queue
-        )
-        task_group.start_soon(
-            gui.draw,
-            messages_queue,
-            sending_queue,
-            status_updates_queue)
-
-        task_group.start_soon(
-            save_messages,
-            read_arguments.filepath,
-            save_messages_queue
+            task_group.start_soon(
+                handle_connections,
+                read_arguments,
+                send_arguments,
+                messages_queue,
+                save_messages_queue,
+                sending_queue,
+                status_updates_queue,
+                watchdog_queue
             )
+            task_group.start_soon(
+                gui.draw,
+                messages_queue,
+                sending_queue,
+                status_updates_queue)
+
+            task_group.start_soon(
+                save_messages,
+                read_arguments.filepath,
+                save_messages_queue
+            )
+    except* ExceptionGroup as err:
+        default_logger.debug(f'Unexcepter error in main {type(err).__name__}')
 
 if __name__ == "__main__":
     read_logger = get_logger('reader')
@@ -294,10 +301,12 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (
         KeyboardInterrupt,
-        gui.TkAppClosed,
-    ) as err:
-        default_logger.debug(f'Chat was closed by user. {type(err).__name__} ')
-        sys.exit()
+        gui.TkAppClosed
+    ):
+        default_logger.debug(f'Чат был закрыт пользователем')
+
     except ExceptionGroup as err:
         for err in err.exceptions:
             default_logger.debug(f'Unexcepter error {type(err).__name__}')
+    finally:
+        sys.exit()

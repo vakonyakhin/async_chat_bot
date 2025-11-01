@@ -41,6 +41,8 @@ def process_new_message(input_field, sending_queue):
 async def update_tk(root_frame, interval=1 / 120):
     while True:
         try:
+            if not root_frame.winfo_exists():
+                raise TkAppClosed("Tk window closed")
             root_frame.update()
         except tk.TclError:
             # if application has been destroyed/closed
@@ -135,16 +137,10 @@ async def draw(messages_queue, sending_queue, status_updates_queue):
         task_group.start_soon(
             update_conversation_history,
             conversation_panel,
-            messages_queue
+            messages_queue,
         )
         task_group.start_soon(
             update_status_panel,
             status_labels,
             status_updates_queue
         )
-        
-    # await asyncio.gather(
-    #     update_tk(root_frame),
-    #     update_conversation_history(conversation_panel, messages_queue),
-    #     update_status_panel(status_labels, status_updates_queue)
-    # )

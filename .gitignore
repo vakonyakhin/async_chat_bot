@@ -112,3 +112,4 @@ venv.bak/
 *.txt
 token.json
 test.ini
+launch.json
